@@ -12,13 +12,15 @@ source:
 build:
   skip: true  # [py<310]
   script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+  entry_points:
+    - trl = trl.cli:main
   number: 0
 
 requirements:
   host:
     - python
     - pip
-    - setuptools
+    - setuptools >=77.0.3
     - pytorch >=1.4.0
   run:
     - jinja2
@@ -27,26 +29,39 @@ requirements:
     - python
     - pytorch >=1.4.0
     - transformers >=4.56.2
-    - numpy >=1.18.2
     - accelerate >=1.4.0
     - datasets >=4.7.0
-    - tyro >=0.5.11
+  run_constrained:
+    # deepspeed
+    - deepspeed >=0.14.4
+    - transformers !=5.1.0
+    # liger
+    - liger-kernel >=0.8.0
+    # peft
+    - peft >=0.8.0
+    # vllm
+    - vllm >=0.12.0,<=0.18.0
+    - aiohttp >=3.13.3
+    # vlm
+    - num2words ==0.5.14
+    # math_verify
+    - math-verify >=0.5.2
+    # openreward
+    - openreward >=0.1.109  # [py>=311]
 
 test:
   imports:
     - trl
   commands:
     - pip check
+    - trl --help
   requires:
     - pip
 
 about:
   home: https://github.com/huggingface/trl
   summary: Train transformer language models with reinforcement learning.
-  description: |
-    TRL is a library for post-training foundation models with supervised fine-tuning,
-    reinforcement learning, and preference optimization on top of the Hugging Face
-    Transformers ecosystem.
+  description: Train transformer language models with reinforcement learning.
   license: Apache-2.0
   license_family: Apache
   license_file: LICENSE
