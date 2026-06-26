@@ -64,7 +64,7 @@ about:
   license: Apache-2.0
   license_family: Apache
   license_file: LICENSE
-  doc_url: https://huggingface.co/docs/trl
+  doc_url: https://huggingface.co/docs/trl/index
   dev_url: https://github.com/huggingface/trl
 
 extra:
