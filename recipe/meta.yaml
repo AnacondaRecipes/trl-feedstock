@@ -1,5 +1,5 @@
 {% set name = "trl" %}
-{% set version = "1.5.1" %}
+{% set version = "0.24.0" %}
 
 package:
   name: {{ name|lower }}
@@ -7,10 +7,19 @@ package:
 
 source:
   url: https://github.com/huggingface/{{ name }}/archive/v{{ version }}.tar.gz
-  sha256: 96b2a15f05bcc30c3024791d7566d8ecf4fa8da1f924cfe25d90cd307c4cbf4b
+  sha256: 864992c86cb6a020ee2a885fd21f9dfa1ec19da9affa73e92a17765bc035df5f
+  patches:
+    # Re-verify optional-integration availability booleans with a real __import__ probe.
+    # Upstream trl 0.24.0 uses transformers.utils.import_utils._is_package_available (via
+    # importlib.util.find_spec) to gate optional imports of mergekit / llm_blender / fastapi
+    # / etc. That check returns non-None (i.e. "available") in some conda envs even when
+    # the underlying package isn't actually importable, so the guarded blocks then execute
+    # and crash with ModuleNotFoundError — breaking `trl --help` and every downstream
+    # consumer of the trainer submodules.
+    - patches/0001-verify-optional-availability-by-real-import.patch
 
 build:
-  skip: true  # [py<310]
+  skip: true  # [py<39]
   script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
   entry_points:
     - trl = trl.cli:main
@@ -24,36 +33,42 @@ requirements:
   run:
     - python
     - accelerate >=1.4.0
-    - datasets >=4.7.0
+    - datasets >=3.0.0
+    - transformers >=4.56.1
+    # jinja2 and packaging are used at runtime (chat_template_utils.py, import_utils.py,
+    # several trainers) but not declared in upstream 0.24.0's pyproject dependencies —
+    # they get pulled in transitively by transformers. List explicitly for correctness.
     - jinja2
     - packaging >20.0
-    - transformers >=4.56.2
   run_constrained:
     # deepspeed
     - deepspeed >=0.14.4
-    - transformers !=5.1.0
+    # judges
+    - openai >=1.23.2
+    - llm-blender >=0.0.2
     # liger
-    - liger-kernel >=0.8.0
+    - liger-kernel >=0.6.2
     # peft
     - peft >=0.8.0
     # vllm
-    - vllm >=0.12.0,<=0.18.0
-    - aiohttp >=3.13.3
+    - vllm ==0.10.2
     # vlm
     - num2words ==0.5.14
     # math_verify
     - math-verify >=0.5.2
-    # openreward
-    - openreward >=0.1.109  # [py>=311]
-    # optional (used when installed; not required for core import/CLI)
-    - rich
 
 test:
   imports:
     - trl
   commands:
     - pip check
-    - trl --help
+    # `trl --help` skipped on py3.14 — transformers 5.3's hf_argparser hits
+    # `TypeError: dict | typing.Callable is not callable` because Python 3.14's
+    # argparse dropped support for PEP-604 union types as `type=`. That code path
+    # only runs from the CLI; programmatic use (`from trl import DPOTrainer`) is
+    # unaffected and is what our downstream consumers (llamafactory) exercise.
+    - trl --help  # [py<314]
+    - python -c "from trl import DPOTrainer, KTOTrainer, SFTTrainer; print(DPOTrainer.__name__, KTOTrainer.__name__, SFTTrainer.__name__)"
   requires:
     - pip
 

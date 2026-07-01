@@ -1,0 +1,44 @@
+From: Xianglong Kong <xkong@anaconda.com>
+Date: 2026-07-01
+Subject: [PATCH] Verify optional-dep availability with a real import
+
+Upstream trl gates optional integrations with `if is_X_available():` blocks
+across mergekit_utils.py, judges.py, callbacks.py, base_trainer.py,
+scripts/vllm_serve.py, and every trainer that supports peft/wandb/liger/vllm/weave/...
+The check itself is transformers.utils.import_utils._is_package_available,
+which uses importlib.util.find_spec — that returns non-None in some conda
+test envs even when the underlying package is not installed. The guarded
+blocks then execute and crash with ModuleNotFoundError, breaking `trl --help`
+and any downstream consumer that touches the trainer submodules (llamafactory's
+`from trl import DPOTrainer` chain hits the same wall).
+
+Iterate the `_X_available` module-level variables set above and re-verify each
+one that reports True by attempting a real `__import__`. Iterating globals()
+keeps this correct as upstream adds or removes availability entries — no
+hardcoded parallel list to maintain.
+
+---
+--- a/trl/import_utils.py
++++ b/trl/import_utils.py
+@@ -41,6 +41,21 @@
+ _vllm_ascend_available = _is_package_available("vllm_ascend")
+ _weave_available = _is_package_available("weave")
+ 
++# transformers._is_package_available uses importlib.util.find_spec, which returns
++# non-None in some conda envs even when the package is not actually importable
++# (namespace-package false positives, stale .dist-info, etc.).  Re-verify every
++# optional-integration boolean populated above by attempting a real __import__,
++# so `if is_X_available():` guards downstream never leak a ModuleNotFoundError.
++# Iterates the availability variables in globals() so this stays correct as
++# upstream adds/removes _X_available entries.
++for _var_name in [n for n in list(globals()) if n.startswith("_") and n.endswith("_available") and globals().get(n)]:
++    _pkg = _var_name[1:-len("_available")]
++    try:
++        __import__(_pkg)
++    except Exception:
++        globals()[_var_name] = False
++
++
+ 
+ def is_deepspeed_available() -> bool:
+     return _deepspeed_available
