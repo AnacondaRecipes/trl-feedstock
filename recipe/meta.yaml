@@ -50,17 +50,9 @@ requirements:
     - liger-kernel >=0.6.2
     # peft
     - peft >=0.8.0
-    # quantization
-    - bitsandbytes
     # vllm
     - vllm ==0.10.2
-    - fastapi
-    - pydantic
-    - requests
-    - uvicorn
     # vlm
-    - pillow
-    - torchvision
     - num2words ==0.5.14
     # math_verify
     - math-verify >=0.5.2
