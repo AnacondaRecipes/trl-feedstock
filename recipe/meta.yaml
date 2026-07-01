@@ -19,7 +19,7 @@ source:
     - patches/0001-verify-optional-availability-by-real-import.patch
 
 build:
-  skip: true  # [py<310]
+  skip: true  # [py<39]
   script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
   entry_points:
     - trl = trl.cli:main
