@@ -1,0 +1,55 @@
+From: Xianglong Kong <xkong@anaconda.com>
+Date: 2026-07-01
+Subject: [PATCH] Verify optional-dep availability with a real import
+
+Upstream trl gates optional integrations with `if is_X_available():` blocks
+across mergekit_utils.py, judges.py, callbacks.py, base_trainer.py, scripts/vllm_serve.py,
+and every trainer that supports peft/wandb/liger/vllm/weave/... The check itself is
+transformers.utils.import_utils._is_package_available, which uses
+importlib.util.find_spec — that returns non-None in some conda test envs
+even when the underlying package is not installed. The guarded blocks then
+execute and crash with ModuleNotFoundError, breaking `trl --help` and any
+downstream consumer that touches the trainer submodules (llamafactory's
+`from trl import DPOTrainer` chain hits the same wall).
+
+Override every optional-dep availability boolean with a real `__import__`
+probe so a False positive from find_spec cannot leak into runtime.
+
+---
+--- a/trl/import_utils.py
++++ b/trl/import_utils.py
+@@ -41,6 +41,34 @@
+ _vllm_ascend_available = _is_package_available("vllm_ascend")
+ _weave_available = _is_package_available("weave")
+ 
++# transformers._is_package_available uses importlib.util.find_spec, which returns
++# non-None in some conda envs even when the package is not actually importable
++# (namespace-package false positives, stale .dist-info, etc.).  Re-verify every
++# optional-integration boolean with a real __import__ probe so `if is_X_available():`
++# guards never leak a ModuleNotFoundError up to consumers.
++for _pkg, _var in (
++    ("deepspeed", "_deepspeed_available"),
++    ("fastapi", "_fastapi_available"),
++    ("joblib", "_joblib_available"),
++    ("liger_kernel", "_liger_kernel_available"),
++    ("llm_blender", "_llm_blender_available"),
++    ("math_verify", "_math_verify_available"),
++    ("mergekit", "_mergekit_available"),
++    ("pydantic", "_pydantic_available"),
++    ("requests", "_requests_available"),
++    ("unsloth", "_unsloth_available"),
++    ("uvicorn", "_uvicorn_available"),
++    ("vllm", "_vllm_available"),
++    ("vllm_ascend", "_vllm_ascend_available"),
++    ("weave", "_weave_available"),
++):
++    if globals()[_var]:
++        try:
++            __import__(_pkg)
++        except Exception:
++            globals()[_var] = False
++
++
+ 
+ def is_deepspeed_available() -> bool:
+     return _deepspeed_available
