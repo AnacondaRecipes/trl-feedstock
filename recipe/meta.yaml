@@ -57,6 +57,7 @@ test:
     - trl
   commands:
     - pip check
+    - python -c "from importlib.metadata import version; assert(version('{{ name }}')=='{{ version }}')"
     - trl --help
   requires:
     - pip
