@@ -49,8 +49,6 @@ requirements:
     - aiohttp >=3.13.3
     # vlm
     - num2words ==0.5.14
-    # optional (used when installed; not required for core import/CLI)
-    - rich
 
 test:
   imports:
